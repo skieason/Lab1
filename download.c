@@ -8,75 +8,158 @@
 #include <stdlib.h>
 
 #define SOCKET_ERROR        -1
-#define BUFFER_SIZE         100
+#define BUFFER_SIZE         5000
 #define HOST_NAME_SIZE      255
+#define FILE_NAME_SIZE      255
+#define MAXMSG              1024
 
-int  main(int argc, char* argv[])
-{
+int  main(int argc, char* argv[]) {
     int hSocket;                 /* handle to socket */
     struct hostent* pHostInfo;   /* holds info about a machine */
-    struct sockaddr_in Address;  /* Internet socket address stuct */
+    struct sockaddr_in Address;  /* Internet socket address struct */
     long nHostAddress;
     char pBuffer[BUFFER_SIZE];
     unsigned nReadAmount;
     char strHostName[HOST_NAME_SIZE];
+    char strPortName[HOST_NAME_SIZE];
     int nHostPort;
+    char strFileName[FILE_NAME_SIZE];
+    char option;
+    int dOpt = 0, cOpt = 0, count = 0, success = 0;
+    int originalCount;
 
-    if(argc < 3)
-      {
-        printf("\nUsage: client host-name host-port\n");
+    if(argc < 4) {
+        perror("\nUsage: ./download host-name host-port URL\n");
         return 0;
-      }
-    else
-      {
+    } else if (argc == 4){
         strcpy(strHostName,argv[1]);
         nHostPort=atoi(argv[2]);
-      }
-
-    printf("\nMaking a socket");
-    /* make a socket */
-    hSocket=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
-
-    if(hSocket == SOCKET_ERROR)
-    {
-        printf("\nCould not make a socket\n");
-        return 0;
+        strcpy(strFileName,argv[3]);
+    } else if (argc == 5) {
+        option = getopt(argc, argv, "d");
+        if (option == '?') {
+            perror("\nUsage: ./download -d host-name host-port URL\n");
+            return 0;
+        }
+        dOpt = 1;
+        strcpy(strHostName,argv[2]);
+        nHostPort=atoi(argv[3]);
+        strcpy(strFileName,argv[4]);
+    } else if (argc == 6) {
+        option = getopt(argc, argv, "c");
+        if (option == '?') {
+            perror("\nUsage: ./download -c count host-name host-port URL\n");
+            return 0;
+        }
+        cOpt = 1;
+        count = atoi(argv[2]);
+        originalCount = atoi(argv[2]);
+        strcpy(strHostName,argv[3]);
+        nHostPort=atoi(argv[4]);
+        strcpy(strFileName,argv[5]);
     }
 
-    /* get IP address from name */
-    pHostInfo=gethostbyname(strHostName);
-    /* copy address into long */
-    memcpy(&nHostAddress,pHostInfo->h_addr,pHostInfo->h_length);
+    do {
+        /* make a socket */
+        hSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-    /* fill address struct */
-    Address.sin_addr.s_addr=nHostAddress;
-    Address.sin_port=htons(nHostPort);
-    Address.sin_family=AF_INET;
+        if (hSocket == SOCKET_ERROR) {
+            printf("\nCould not make a socket\n");
+            return 0;
+        }
 
-    printf("\nConnecting to %s (%X) on port %d",strHostName,nHostAddress,nHostPort);
+        /* get IP address from name */
+        pHostInfo = gethostbyname(strHostName);
+        if (pHostInfo == NULL) {
+            perror("\nHostname Invalid\n");
+            return 0;
+        }
 
-    /* connect to host */
-    if(connect(hSocket,(struct sockaddr*)&Address,sizeof(Address)) 
-       == SOCKET_ERROR)
-    {
-        printf("\nCould not connect to host\n");
-        return 0;
-    }
+        /* copy address into long */
+        memcpy(&nHostAddress, pHostInfo->h_addr, pHostInfo->h_length);
 
-    /* read from socket into buffer
-    ** number returned by read() and write() is the number of bytes
-    ** read or written, with -1 being that an error occured */
-    nReadAmount=read(hSocket,pBuffer,BUFFER_SIZE);
-    printf("\nReceived \"%s\" from server\n",pBuffer);
-    /* write what we received back to the server */
-    write(hSocket,pBuffer,nReadAmount);
-    printf("\nWriting \"%s\" to server",pBuffer);
+        /* fill address struct */
+        Address.sin_addr.s_addr = nHostAddress;
+        Address.sin_port = htons(nHostPort);
+        Address.sin_family = AF_INET;
 
-    printf("\nClosing socket\n");
-    /* close socket */                       
-    if(close(hSocket) == SOCKET_ERROR)
-    {
-        printf("\nCould not close socket\n");
-        return 0;
+//    printf("\nConnecting to %s (%X) on port %d",strHostName,nHostAddress,nHostPort);
+
+        /* connect to host */
+        if (connect(hSocket, (struct sockaddr *) &Address, sizeof(Address))
+            == SOCKET_ERROR) {
+            printf("\nCould not connect to host\n");
+            return 0;
+        }
+
+        char *message = (char *) malloc(MAXMSG);
+        if (dOpt == 1) {
+            sprintf(message, "GET %s HTTP/1.1\r\nHost:%s:%d\r\n\r\n", strFileName, strHostName, nHostPort);
+            printf("\n%s", message);
+        } else if (cOpt == 1) {
+            sprintf(message, "GET %s HTTP/1.1\r\nHost:%s:%d\r\n\r\n", strFileName, strHostName, nHostPort);
+        } else {
+            sprintf(message, "GET %s \r\nHTTP/1.1\r\nHost:%s:%d\r\n\r\n", strFileName, strHostName, nHostPort);
+        }
+        write(hSocket, message, strlen(message));
+//    do {
+        count--;
+        memset(pBuffer, 0, BUFFER_SIZE);
+        nReadAmount = read(hSocket, pBuffer, BUFFER_SIZE);
+
+        if (strstr(pBuffer, "200 OK") != NULL) {
+            success++;
+        }
+//    } while (count > 0);
+//
+//        if (cOpt == 1) {
+//            printf("\n Successfully downloaded the file %d/%d times", success, originalCount);
+//        } else {
+//            printf("\n %s", pBuffer);
+//        }
+
+        if (close(hSocket) == SOCKET_ERROR) {
+            printf("\nCould not close socket\n");
+            return 0;
+        }
+
+        free(message);
+    } while (count > 0);
+    if (cOpt == 1) {
+        printf("\n Successfully downloaded the file %d/%d times", success, originalCount);
+    } else {
+        printf("\n %s", pBuffer);
     }
 }
+
+
+
+
+//    } else {
+//        memset(pBuffer, 0, BUFFER_SIZE);
+//        nReadAmount=read(hSocket,pBuffer,BUFFER_SIZE);
+//        printf("\n %s",pBuffer);
+//    }
+//    write(hSocket,message,strlen(message));
+
+
+//    strstr(read(hSocket,pBuffer, BUFFER_SIZE - 1), "200 OK");
+
+//    char *responseHeaders = (char*) malloc(MAXHEADERS);
+//    int contentLength = 0;
+//    memset(pBuffer, 0, BUFFER_SIZE);
+//    while(read(hSocket, pBuffer, BUFFER_SIZE - 1) != 0) {
+////        printf("%s", pBuffer);
+//        strcat(responseHeaders, pBuffer);
+//        if (strstr(pBuffer, "\r\n\r\n") == NULL) {
+//
+//        }
+//        memset(pBuffer, 0, BUFFER_SIZE);
+//    }
+//    nReadAmount=read(hSocket,pBuffer,BUFFER_SIZE);
+//    if (cOpt != 1) {
+//        printf("\n %s",pBuffer);
+//    } else {
+//        printf("\n%d",success);
+//    }
+//    char *response = (char *) malloc(contentLength);
