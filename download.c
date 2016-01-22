@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +13,23 @@
 #define HOST_NAME_SIZE      255
 #define FILE_NAME_SIZE      255
 #define MAXMSG              1024
+
+int isNumber(char number[])
+{
+    int i = 0;
+
+    //checking for negative numbers
+    if (number[0] == '-')
+        i = 1;
+    for (; number[i] != 0; i++)
+    {
+        //if (number[i] > '9' || number[i] < '0')
+        if (!isdigit(number[i]))
+            return 0;
+    }
+    return 1;
+}
+
 
 int  main(int argc, char* argv[]) {
     int hSocket;                 /* handle to socket */
@@ -33,6 +51,10 @@ int  main(int argc, char* argv[]) {
         return 0;
     } else if (argc == 4){
         strcpy(strHostName,argv[1]);
+        if (isNumber(argv[2]) == 0) {
+            perror("\n Usage: ./download host-name host-port URL\n Port must be a number\n");
+            return 0;
+        }
         nHostPort=atoi(argv[2]);
         strcpy(strFileName,argv[3]);
     } else if (argc == 5) {
@@ -43,6 +65,10 @@ int  main(int argc, char* argv[]) {
         }
         dOpt = 1;
         strcpy(strHostName,argv[2]);
+        if (isNumber(argv[3]) == 0) {
+            perror("\n Usage: ./download host-name host-port URL\n Port must be a number\n");
+            return 0;
+        }
         nHostPort=atoi(argv[3]);
         strcpy(strFileName,argv[4]);
     } else if (argc == 6) {
@@ -55,6 +81,10 @@ int  main(int argc, char* argv[]) {
         count = atoi(argv[2]);
         originalCount = atoi(argv[2]);
         strcpy(strHostName,argv[3]);
+        if (isNumber(argv[4]) == 0) {
+            perror("\n Usage: ./download host-name host-port URL\n Port must be a number\n");
+            return 0;
+        }
         nHostPort=atoi(argv[4]);
         strcpy(strFileName,argv[5]);
     }
