@@ -44,7 +44,7 @@ int  main(int argc, char* argv[]) {
     char strFileName[FILE_NAME_SIZE];
     char option;
     int dOpt = 0, cOpt = 0, count = 0, success = 0;
-    int originalCount;
+    int originalCount; 
 
     if(argc < 4) {
         perror("\nUsage: ./download host-name host-port URL\n");
